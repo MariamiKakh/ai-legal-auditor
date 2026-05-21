@@ -1,0 +1,12 @@
+{
+  "name": "ai-legal-auditor-mcp-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP filesystem server for the AI Legal Auditor — serves backend/documents/ to the compliance agent.",
+  "scripts": {
+    "start": "mcp-server-filesystem ../documents"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server-filesystem": "latest"
+  }
+}

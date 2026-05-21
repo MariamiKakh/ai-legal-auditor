@@ -216,3 +216,30 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+
+.env
+.env.local
+.env.production
+
+
+*.key
+*.pem
+
+.DS_Store
+Thumbs.db
+
+# ChromaDB vector store
+chroma_db/
+chroma_store/
+**/chroma_store/
+
+# SQLite databases
+*.db
+*.sqlite3
+
+node_modules/
+.next/
+dist/
+build/
