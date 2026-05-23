@@ -2,7 +2,7 @@ from backend.rag.embedder import embed
 from backend.rag.store import get_collection
 
 
-def query_policies(query: str, n_results: int = 5) -> list[dict]:
+def query_policies(query: str, n_results: int = 10) -> list[dict]:
     collection = get_collection()
     query_embedding = embed([query])[0]
     results = collection.query(
