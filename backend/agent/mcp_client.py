@@ -2,6 +2,7 @@ import asyncio
 import threading
 import os
 import concurrent.futures
+import traceback
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -61,8 +62,7 @@ class MCPClient:
                             result_future.set_exception(e)
 
         except Exception as e:
-            import traceback
-            traceback.print_exc() 
+            traceback.print_exc()
             if not self._ready_event.is_set():
                 self._ready_event.set()
         finally:

@@ -4,15 +4,30 @@ The idea of this project is to build a system,that automatically checks
 contracts against company policies using RAG, MCP, and 
 Claude API.
 
+The problem it solves is pretty straightforward — companies deal with 
+a lot of incoming contracts from suppliers, partners, and clients. 
+Manually checking each one against internal policies takes time and 
+is easy to mess up. This system automates that process.
+
 ## What It Does
 
-The company has internal policy documents (their rules), 
-and when they get a new contract from a supplier or partner, 
-the system checks if the contract breaks any of those rules.
+The way it works is: the company uploads their internal policy 
+documents (things like data protection rules, payment terms, 
+procurement standards etc.) and these get processed and stored in a 
+vector database. When a new contract comes in, the agent reads it, 
+searches for the most relevant policy sections, and then uses Claude 
+to compare them and find any violations.
 
-For example — if company policy says payment terms can't 
-exceed 30 days, but a contract says 45 days, the system 
-catches that and puts it in the report.
+So for example — if company policy says payment terms can't exceed 
+30 days, but a contract comes in with 45-day terms, the system 
+catches that and flags it in the compliance report. The user can then 
+open a chat window and ask things like "rewrite clause 3 so it 
+complies with the policy."
+
+The project has three main parts:
+- A backend with JWT auth, a RAG pipeline, and an MCP filesystem server
+- A compliance agent that orchestrates everything (written by hand)
+- A React frontend with a file manager, audit trigger, and chat interface
 
 ## Project Structure
 
@@ -64,38 +79,27 @@ Frontend is React with Vite. Vite is just faster and simpler
 than Create React App. Axios for API calls, React Router 
 for navigation.
 
-## Environment Variables
-
-Copy .env.example to .env before running anything.
-Never commit .env to GitHub — it's in .gitignore.
-
-DATABASE_URL=sqlite:///./legal_auditor.db
-JWT_SECRET=pick-something-long-and-random
-JWT_ALGORITHM=HS256
-JWT_EXPIRY_MINUTES=60
-ANTHROPIC_API_KEY=your-key-here
-CHROMA_PERSIST_DIR=backend/rag/chroma_store
-MCP_SERVER_PATH=backend/mcp_server
-
 ## How to Run
 
-# 1. install backend dependencies
-cd backend
-pip install -r requirements.txt
+# 1. activate the virtual environment
+source venv/bin/activate
 
-# 2. embed the policy documents
-# do this once at the start and again if policies change
+# 2. install backend dependencies (first time only)
+pip install -r backend/requirements.txt
+
+# 3. install MCP server (first time only)
+cd backend/mcp_server && npm install && cd ../..
+
+# 4. embed the policy documents (first time, and when policies change)
 python backend/rag/embed_policies.py
 
-# 3. start the backend
+# 5. start the backend
 uvicorn backend.api.main:app --reload
 
-# 4. start the frontend (in a separate terminal)
+# 6. start the frontend (in a separate terminal)
 cd frontend
 npm install
 npm run dev
-
-## The Agent
 
 The agent lives in backend/agent/ and this is the part 
 I wrote completely by hand without any AI help. This was 
@@ -161,6 +165,27 @@ Task 3 — React frontend
 
 Don't jump ahead. Each task depends on the previous one 
 actually working end to end.
+
+## Task 2 design decisions
+
+1. Background thread and event loop in mcp_client.py
+FastAPI runs synchronously, but the MCP Python SDK is fully async. Calling MCP functions directly from a FastAPI route is not possible. To solve this, when an audit starts the client spins up a dedicated background thread with its own asyncio event loop. The event loop runs the MCP session in that thread while FastAPI continues handling requests normally on the main thread. The two sides communicate without blocking each other.
+
+2. Queue for cross-thread communication
+
+Because the asyncio loop lives in its own thread, you cannot call its async functions directly from synchronous code. I used an asyncio.Queue inside the loop and call_soon_threadsafe to push tool call requests from the sync side into the queue. The loop picks up each request, executes it against the MCP session, and places the result into a concurrent.futures.Future. The synchronous side blocks on that Future until the result arrives, then continues
+
+3. Two Claude API calls instead of one
+The first call runs the full agentic reasoning loop, claude reads the contract, searches policies, and reasons through violations in natural language. But the backend requires a strict, structured JSON response. So, instead of forcing the first call to output perfect JSON (which interrupts the model's reasoning), I added a second lightweight Claude call whose only job is to take the free-text analysis and parse it into the exact AuditReport schema. This two-step approach is significantly more reliable and consistent than trying to do reasoning and formatting in a single call
+
+4. pdfplumber for PDF text extraction
+The MCP filesystem server reads plain text files natively, but PDFs are a binary format and cannot be read the same way. To extract text from contract PDFs I used pdfplumber. The MCP server is still called to verify the file exists, but the actual text extraction happens locally via pdfplumber .
+
+5. Tools defined manually rather than fetched from MCP
+ Even though the MCP server exposes its own tool list, I defined read_contract and search_policies as custom tools in the orchestrator with carefully written descriptions. The quality of a tool description directly affects how well Claude uses it. A generic description like "read a file" produced poor results. Writing descriptions that explicitly explained the audit context, produced significantly better and more consistent analysis
+
+6. Policy search via ChromaDB (RAG) rather than MCP
+The 8 company policy documents are large PDFs that do not change between audits. Sending all 8 files to Claude on every audit call would be slow and expensive, and would fill the context window with irrelevant content. Instead, policies are chunked and embedded into ChromaDB once at setup time. When the agent needs to check a specific topic — payment terms, IP ownership, data protection — it retrieves only the relevant chunks from ChromaDB. This keeps the context window focused and makes the analysis more accurate.
 
 ## If Something Is Broken
 
