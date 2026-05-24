@@ -14,6 +14,7 @@ Claude API, and generates a structured compliance report.
 
 ## Project Structure
 
+```
 ai-legal-auditor/
 ├── backend/
 │   ├── auth/          # login, register, JWT tokens
@@ -33,6 +34,7 @@ ai-legal-auditor/
 │   └── skills/        # custom slash commands for Claude Code
 ├── CLAUDE.md
 └── README.md
+```
 
 ## Tech Stack
 
