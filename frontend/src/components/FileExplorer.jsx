@@ -53,6 +53,7 @@ export default function FileExplorer({ selectedContract, onSelectContract, onRep
             {files.contracts.map((name) => (
               <li
                 key={name}
+                title={name}
                 onClick={() => onSelectContract(name)}
                 style={{
                   ...styles.item,
